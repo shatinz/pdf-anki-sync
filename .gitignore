@@ -1,0 +1,17 @@
+# Cache and Configuration files (contains local paths and API keys)
+config.json
+synced_highlights.json
+
+# Test PDFs
+*.pdf
+test_book.pdf
+
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Operating system files
+.DS_Store
+Thumbs.db
