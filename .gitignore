@@ -1,6 +1,7 @@
 # Cache and Configuration files (contains local paths and API keys)
 config.json
 synced_highlights.json
+*.log
 
 # Test PDFs
 *.pdf

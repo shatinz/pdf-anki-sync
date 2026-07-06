@@ -329,6 +329,16 @@ def clean_text(text):
     text = text.replace("-\n", "").replace("\n", " ")
     return " ".join(text.split())
 
+def clean_word_for_lookup(text):
+    if not text:
+        return ""
+    # Strip smart/normal quotes, punctuation, and brackets from start and end
+    # but preserve interior ones (like hyphens in 'self-evident' or apostrophes in 'user's')
+    text = text.strip()
+    text = re.sub(r'^[\W_]+', '', text)
+    text = re.sub(r'[\W_]+$', '', text)
+    return text.strip()
+
 def get_sentence_containing_word(page, highlight_rect, word_text):
     # Find all text blocks on the page
     blocks = page.get_text("blocks")
@@ -398,10 +408,20 @@ def is_valid_word_highlight(text):
     return True
 
 def sync_pdf(pdf_path, dry_run=False, log_callback=None):
+    log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sync_activity.log")
+
     def log(msg):
         print(msg)
         if log_callback:
             log_callback(msg)
+        # Write to local file for persistent debugging logs
+        try:
+            with open(log_file, "a", encoding="utf-8") as lf:
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                lf.write(f"[{timestamp}] {msg}\n")
+        except Exception:
+            pass
 
     if not os.path.exists(pdf_path):
         log(f"Error: File not found - {pdf_path}")
@@ -483,43 +503,48 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
                     })
                     continue
 
-                log(f"Found new highlight: '{highlight_text}' on Page {page_num + 1}")
+                # Clean the word for lookups, duplicate checks, and note fields
+                clean_word = clean_word_for_lookup(highlight_text)
+                if not clean_word:
+                    continue
 
-                # Extract context sentence
-                context_sentence = get_sentence_containing_word(page, annot.rect, highlight_text)
-                formatted_context = bold_word_in_sentence(context_sentence, highlight_text)
+                log(f"Found new highlight: '{highlight_text}' (Cleaned: '{clean_word}') on Page {page_num + 1}")
+
+                # Extract context sentence using the cleaned word
+                context_sentence = get_sentence_containing_word(page, annot.rect, clean_word)
+                formatted_context = bold_word_in_sentence(context_sentence, clean_word)
 
                 # Fetch definition
                 definition = None
                 if config["gemini_api_key"]:
-                    log(f"Fetching Gemini API definition for '{highlight_text}'...")
-                    definition = fetch_definition_gemini(highlight_text, context_sentence, config["gemini_api_key"])
+                    log(f"Fetching Gemini API definition for '{clean_word}'...")
+                    definition = fetch_definition_gemini(clean_word, context_sentence, config["gemini_api_key"])
                 
                 if not definition:
-                    log(f"Fetching Free Dictionary API definition for '{highlight_text}'...")
-                    definition = fetch_definition_free_dict(highlight_text)
+                    log(f"Fetching Free Dictionary API definition for '{clean_word}'...")
+                    definition = fetch_definition_free_dict(clean_word)
 
                 if not definition:
-                    definition = f"<p>Definition lookup failed. (Word: {highlight_text})</p>"
+                    definition = f"<p>Definition lookup failed. (Word: {clean_word})</p>"
 
                 # Add to Anki
                 success = True
                 if not dry_run and anki:
                     # Check for duplicates in Anki deck
-                    if anki.note_exists(highlight_text, config["deck_name"], config["note_type_name"]):
-                        log(f"Note for '{highlight_text}' already exists in deck '{config['deck_name']}'. Skipping Anki upload.")
+                    if anki.note_exists(clean_word, config["deck_name"], config["note_type_name"]):
+                        log(f"Note for '{clean_word}' already exists in deck '{config['deck_name']}'. Skipping Anki upload.")
                     else:
                         fields = {
-                            "Word": highlight_text,
+                            "Word": clean_word,
                             "Definition": definition,
                             "Context": formatted_context,
                             "Source": f"{pdf_filename} (Page {page_num + 1})"
                         }
                         note_id = anki.add_note(config["deck_name"], config["note_type_name"], fields)
                         if note_id:
-                            log(f"Successfully added '{highlight_text}' to Anki (ID: {note_id})")
+                            log(f"Successfully added '{clean_word}' to Anki (ID: {note_id})")
                         else:
-                            log(f"[ERROR] Failed to add '{highlight_text}' to Anki.")
+                            log(f"[ERROR] Failed to add '{clean_word}' to Anki.")
                             success = False
 
                 if success:
