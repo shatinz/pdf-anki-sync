@@ -173,7 +173,34 @@ class PDFAnkiSyncGUI:
         self.create_label_entry(left_panel, "Anki Card Type Name", self.model_var)
         
         # Gemini API Key (Optional)
-        self.create_label_entry(left_panel, "Gemini API Key (Optional, for context meanings)", self.api_key_var, show="*")
+        api_label = tk.Label(left_panel, text="Gemini API Key (Optional)", font=("Segoe UI", 10, "bold"), fg=FG_MUTED, bg=BG_PANEL)
+        api_label.pack(anchor="w", pady=(15, 5))
+
+        api_frame = tk.Frame(left_panel, bg=BG_PANEL)
+        api_frame.pack(fill="x", pady=0)
+
+        self.api_entry = tk.Entry(
+            api_frame,
+            textvariable=self.api_key_var,
+            bg=BG_INPUT,
+            fg=FG_MAIN,
+            insertbackground=FG_MAIN,
+            bd=1,
+            relief="flat",
+            font=("Segoe UI", 10),
+            show="*"
+        )
+        self.api_entry.pack(fill="x", side="left", expand=True, ipady=4)
+
+        self.api_show_btn = ModernButton(
+            api_frame,
+            text="Show",
+            command=self.toggle_api_visibility,
+            bg=BG_INPUT,
+            fg=FG_MAIN,
+            width=6
+        )
+        self.api_show_btn.pack(side="right", padx=(8, 0))
         
         # Watch Directory Label & Selector
         watch_label = tk.Label(left_panel, text="Watch Directory (PDF Folder)", font=("Segoe UI", 10, "bold"), fg=FG_MUTED, bg=BG_PANEL)
@@ -273,6 +300,14 @@ class PDFAnkiSyncGUI:
         
         # Initial greeting
         self.append_log("System initialized. Connect Anki and select a file/directory to get started.", "info")
+
+    def toggle_api_visibility(self):
+        if self.api_entry.cget("show") == "*":
+            self.api_entry.config(show="")
+            self.api_show_btn.config(text="Hide")
+        else:
+            self.api_entry.config(show="*")
+            self.api_show_btn.config(text="Show")
 
     def style_panel_header(self, parent, title):
         lbl = tk.Label(parent, text=title, font=("Segoe UI Semibold", 14), fg=FG_MAIN, bg=BG_PANEL)

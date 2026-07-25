@@ -1,68 +1,76 @@
 # PDF Highlights to Anki Sync Tool
 
-A lightweight, automated desktop application that extracts highlighted vocabulary words from PDF files saved in **Microsoft Edge** and syncs them directly to your **Anki** library. It automatically generates English definitions and fetches the surrounding context sentence from the PDF.
+A lightweight, automated desktop application that extracts highlighted vocabulary words from PDF files saved in **Microsoft Edge** and syncs them directly to your **Anki** library. It automatically generates rich English definitions, native Text-to-Speech audio, 2–4 natural collocations, example sentences, and extracts the exact context sentence from the PDF.
 
 ---
 
 ## Features
 
 1. **Auto-Watch Mode:** Run the watcher in the background. Every time you save a PDF (`Ctrl + S` in Microsoft Edge), it automatically scans the PDF and syncs new highlights.
-2. **Smart Word Filter:** Automatically distinguishes between highlighted vocabulary words/short phrases (1 to 4 words) and highlighted full sentences. It **skips sentence highlights** to keep your deck focused, but still extracts the correct surrounding context sentence for vocabulary words.
-3. **Automatic Card Generation:** Automatically creates the deck and a premium, responsive Note Type (`English-PDF-Vocabulary`) in Anki (styled for both Light and Dark mode) if they don't already exist.
-4. **Rich Definitions:** Looks up phonetic pronunciation and dictionary meanings using the free English Dictionary API.
-5. **Gemini API Integration (Optional):** If you configure a Gemini API key, the tool will use AI to fetch precise, context-aware translations and definitions tailored exactly to how the word was used in the sentence.
-6. **Modern Dark-Mode GUI:** An easy-to-use control panel to manage settings, monitor connection state, view live sync logs, and trigger manual files sync.
+2. **Deep Pattern Learning:** Automatically generates:
+   - **Built-in Text-to-Speech (TTS):** Native audio pronunciation powered by Anki's TTS engine (`{{tts en_US:Word}}`).
+   - **2–4 Common Collocations:** Learn how words naturally pair together in English.
+   - **Natural Example Sentence:** Contextual usage reinforcement.
+   - **Synonyms & Antonyms:** Expand vocabulary families.
+3. **Smart Word Filter:** Automatically distinguishes between highlighted vocabulary words/phrases (1 to 4 words) and highlighted full sentences. It **skips sentence highlights** to keep your deck focused.
+4. **Automatic Card & Template Sync:** Creates or updates the `English-PDF-Vocabulary` Note Type in Anki (styled for both Light and Dark mode). Updating templates retroactively enables speech and formatting for existing cards.
+5. **Gemini API & Free Dictionary Support:** AI-powered context-aware breakdowns via Gemini (`gemini-2.5-flash` with rate-limiting pauses and exponential backoff retry logic), with a seamless fallback to the Free Dictionary API.
+6. **Modern Dark-Mode GUI:** Easy-to-use control panel with live activity logs and connection status indicators.
+7. **Standalone Windows Executable:** Run directly as a single `.exe` file without needing Python installed.
 
 ---
 
-## Setup Instructions
+## Quick Start (Standalone Executable)
 
-### 1. Configure Anki Desktop
-To enable external integration, Anki needs the **AnkiConnect** add-on installed:
-1. Open Anki.
-2. Go to **Tools -> Add-ons**.
-3. Click **Get Add-ons...** on the right.
-4. Paste the code: **`2055492159`** and click **OK**.
-5. Restart Anki to activate it. Keep Anki running while syncing!
+1. Download **`PDF_Anki_Sync.exe`** from the [Latest GitHub Release](https://github.com/shatinz/pdf-anki-sync/releases).
+2. Ensure **Anki Desktop** is running with the **AnkiConnect** add-on installed (code: `2055492159`).
+3. Double-click **`PDF_Anki_Sync.exe`** to launch the GUI.
 
-### 2. Install Python Dependencies
-Run the setup batch file located in the project directory to install dependencies (`pymupdf` and `requests`):
-- Double-click **`setup_env.bat`** (or open terminal in `C:\prj\pdf-anki-sync` and run `pip install pymupdf requests`).
+---
+
+## Setup & Anki Configuration
+
+### 1. Configure AnkiConnect (Required for Auto-Sync)
+To allow external syncs into Anki:
+1. Open Anki Desktop.
+2. Go to **Tools -> Add-ons -> Get Add-ons...**
+3. Paste code **`2055492159`** and click **OK**.
+4. Restart Anki.
+
+### 2. Scientific Retention Settings (FSRS Algorithm)
+To achieve optimal scientific memory retention (90% target retention rate with minimal review fatigue):
+1. In Anki Desktop, click the gear icon ⚙️ next to your deck (or go to **Deck Options**).
+2. Scroll down to **Advanced** or **FSRS**.
+3. Toggle **Enable FSRS** to **ON**.
+4. Set **Desired retention** to **`0.90`** (90% target retention).
+5. Click **Save**.
+
+*Why FSRS?* FSRS (Free Spaced Repetition Scheduler) is scientifically proven to reduce review workload by 20–30% compared to Anki's default SM-2 algorithm while maintaining higher long-term retention.
 
 ---
 
 ## How to Use
 
-### Using the GUI (Recommended)
-1. Double-click or run:
-   ```bash
-   python gui.py
-   ```
-2. Check the top-right indicator to verify it says **`ANKI CONNECTED`** (ensure Anki Desktop is running).
-3. Select your **Watch Directory** (the folder where you save/read your PDF books).
-4. Click **Save Config**.
-5. Click **Enable Auto-Watch**. The console will report it is monitoring your files.
-6. Now, open any PDF inside that folder using **Microsoft Edge**. Highlight any word you want to learn, and press **`Ctrl + S`** in Edge to save the document. 
-7. Within 2 seconds, the console in the GUI will report that the word was successfully synced!
+### Using the GUI
+1. Run `PDF_Anki_Sync.exe` (or `python gui.py`).
+2. Verify top-right indicator says **`ANKI CONNECTED`**.
+3. Select your **Watch Directory** (the folder containing your PDF books).
+4. Click **Save Config**, then **Enable Auto-Watch**.
+5. Open any PDF in **Microsoft Edge**, highlight vocabulary words, and press **`Ctrl + S`**.
+6. The app automatically extracts the words and syncs them to Anki within 2 seconds!
 
-### Using the Command Line (CLI)
-You can also sync a single PDF file directly via the terminal:
+### Using Python Source
+If running from source:
 ```bash
-python sync.py "C:\path\to\your\book.pdf"
-```
-To run a test scan without uploading to Anki:
-```bash
-python sync.py "C:\path\to\your\book.pdf" --dry-run
+pip install pymupdf requests pyinstaller
+python gui.py
 ```
 
 ---
 
-## How it works
-
-When a highlight annotation is detected:
-- **Geometry Overlap:** The engine analyzes the bounding boxes of the highlight and checks which text block (paragraph) on the page it intersects.
-- **Context Extraction:** The paragraph text is split into sentences using a regex parser. The sentence containing the highlighted word/phrase is chosen and formatted to bold the target word.
-- **Card Format:**
-  - **Front of Card:** Highlighted word and the context sentence (with the word bolded).
-  - **Back of Card:** Phonetics, definitions (grouped by parts of speech), and the source book/page information.
-- **Local Cache:** Synced annotations are cached by page number, text, and bounding-box coordinates in `synced_highlights.json`. If you edit or delete a card inside Anki, it will not be re-added unless you manually delete the cache file.
+## Building the Executable
+To build the `.exe` yourself:
+```bash
+double-click build_exe.bat
+```
+The output file will be generated in `dist/PDF_Anki_Sync.exe`.

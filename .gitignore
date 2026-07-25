@@ -7,6 +7,11 @@ synced_highlights.json
 *.pdf
 test_book.pdf
 
+# PyInstaller Build artifacts
+build/
+dist/
+*.spec
+
 # Python compiled files
 __pycache__/
 *.pyc

@@ -13,8 +13,16 @@ DEFAULT_CONFIG = {
     "watch_directory": ""
 }
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "synced_highlights.json")
+import threading
+
+def get_app_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_FILE = os.path.join(get_app_dir(), "config.json")
+CACHE_FILE = os.path.join(get_app_dir(), "synced_highlights.json")
+cache_lock = threading.Lock()
 
 # Styling for Anki cards (Dark and Light responsive)
 ANKI_CARD_CSS = """
@@ -119,6 +127,43 @@ ANKI_CARD_CSS = """
   margin-top: 25px;
   letter-spacing: 0.5px;
 }
+.section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #7b1fa2;
+  font-weight: 700;
+  margin-top: 14px;
+  margin-bottom: 4px;
+}
+.nightMode .section-title, .night_mode .section-title {
+  color: #ce93d8;
+}
+.collocations-list, .synonyms-list {
+  font-size: 15px;
+  color: #444;
+  margin: 4px 0 10px 0;
+  padding-left: 20px;
+}
+.nightMode .collocations-list, .night_mode .collocations-list,
+.nightMode .synonyms-list, .night_mode .synonyms-list {
+  color: #ccc;
+}
+.example-sentence {
+  font-size: 15px;
+  font-style: italic;
+  color: #37474f;
+  background: #eceff1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 6px;
+  border-left: 3px solid #78909c;
+}
+.nightMode .example-sentence, .night_mode .example-sentence {
+  color: #cfd8dc;
+  background: #37474f;
+  border-left: 3px solid #90a4ae;
+}
 """
 
 def load_config():
@@ -139,21 +184,23 @@ def load_config():
         return DEFAULT_CONFIG
 
 def load_cache():
-    if not os.path.exists(CACHE_FILE):
-        return {}
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading cache: {e}. Starting fresh.")
-        return {}
+    with cache_lock:
+        if not os.path.exists(CACHE_FILE):
+            return {}
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading cache: {e}. Starting fresh.")
+            return {}
 
 def save_cache(cache):
-    try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(cache, f, indent=4)
-    except Exception as e:
-        print(f"Error saving cache: {e}")
+    with cache_lock:
+        try:
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(cache, f, indent=4)
+        except Exception as e:
+            print(f"Error saving cache: {e}")
 
 class AnkiConnectClient:
     def __init__(self, server_url="http://localhost:8765"):
@@ -250,6 +297,8 @@ class AnkiConnectClient:
             note["tags"] = tags
         return self._send("addNote", {"note": note})
 
+import time
+
 def fetch_definition_free_dict(word):
     url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word.strip()}"
     try:
@@ -272,54 +321,111 @@ def fetch_definition_free_dict(word):
                 if phonetic_text:
                     html += f"<p style='font-style: italic; color: #888; margin: 0 0 10px 0;'>Phonetic: {phonetic_text}</p>"
                 
+                all_synonyms = []
+                all_antonyms = []
+
                 for meaning in meanings:
                     pos = meaning.get("partOfSpeech", "")
                     html += f"<div class='part-of-speech'>{pos}</div><ul>"
+                    # Collect synonyms/antonyms
+                    all_synonyms.extend(meaning.get("synonyms", []))
+                    all_antonyms.extend(meaning.get("antonyms", []))
+                    
                     # Top 3 definitions
                     for d in meaning.get("definitions", [])[:3]:
                         def_text = d.get("definition", "")
                         example = d.get("example", "")
+                        if d.get("synonyms"):
+                            all_synonyms.extend(d.get("synonyms"))
+                        if d.get("antonyms"):
+                            all_antonyms.extend(d.get("antonyms"))
                         html += f"<li>{def_text}"
                         if example:
                             html += f" <br><span style='color: #888; font-style: italic;'>Example: \"{example}\"</span>"
                         html += "</li>"
                     html += "</ul>"
+                
+                # Append Synonyms & Antonyms if available
+                syn_text = ", ".join(list(dict.fromkeys(all_synonyms))[:5])
+                ant_text = ", ".join(list(dict.fromkeys(all_antonyms))[:5])
+                if syn_text or ant_text:
+                    html += "<div class='section-title'>Synonyms & Antonyms</div><div class='synonyms-list'>"
+                    if syn_text:
+                        html += f"<div><b>Synonyms:</b> {syn_text}</div>"
+                    if ant_text:
+                        html += f"<div><b>Antonyms:</b> {ant_text}</div>"
+                    html += "</div>"
+
                 return html
     except Exception as e:
         print(f"Dictionary API lookup failed for '{word}': {e}")
     return None
 
 def fetch_definition_gemini(word, context, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-1.5-flash"
+    ]
+    
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key
+    }
     prompt = f"""
-Provide the English definition, part of speech, and phonetic spelling for the word/phrase "{word}" based on its context.
+Provide a comprehensive English language learning breakdown for the word or phrase "{word}" based on its context in the sentence: "{context}".
 
-Context: "{context}"
+Format the response ONLY as clean HTML suitable for an Anki card back. Use these exact structural elements:
+1. Phonetic spelling at top: `<p style='font-style: italic; color: #888; margin: 0 0 10px 0;'>Phonetic: [phonetic]</p>`
+2. Part of Speech: `<div class="part-of-speech">[Part of speech]</div>`
+3. Definition: `<ul><li>[Clear definition relevant to context]</li></ul>`
+4. Collocations:
+   `<div class="section-title">Common Collocations (2-4)</div>`
+   `<ul class="collocations-list"><li>[Collocation 1]</li><li>[Collocation 2]</li>...</ul>`
+5. Natural Example Sentence:
+   `<div class="section-title">Natural Example Sentence</div>`
+   `<div class="example-sentence">[A natural example sentence using the word properly]</div>`
+6. Synonyms & Antonyms (if applicable):
+   `<div class="section-title">Synonyms & Antonyms</div>`
+   `<div class="synonyms-list"><div><b>Synonyms:</b> [2-3 synonyms]</div><div><b>Antonyms:</b> [1-2 antonyms if any]</div></div>`
 
-Format the response as clean HTML to be displayed on the back of an Anki card.
-Use the following styling elements:
-- Wrap parts of speech in `<div class="part-of-speech">`
-- Wrap definition points in `<ul>` and `<li>`
-- Keep the phonetic spelling at the top wrapped in `<p style='font-style: italic; color: #888; margin: 0 0 10px 0;'>Phonetic: ...</p>`
-Keep it concise and relevant to the meaning in this specific sentence. Do NOT wrap the code in ```html or other markdown blocks. Return raw HTML.
+Keep it concise, clear, and focused on deep natural language pattern mastery. Do NOT include ```html markdown blocks. Return raw HTML only.
 """
     payload = {
         "contents": [{
             "parts": [{"text": prompt}]
         }]
     }
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        if response.status_code == 200:
-            result = response.json()
-            html = result['candidates'][0]['content']['parts'][0]['text']
-            # Strip markdown code blocks if present
-            html = re.sub(r"^```html\s*", "", html, flags=re.IGNORECASE)
-            html = re.sub(r"```$", "", html)
-            return html.strip()
-    except Exception as e:
-        print(f"Gemini API lookup failed for '{word}': {e}")
+
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+        
+        # Exponential backoff retry loop (up to 3 retries)
+        for attempt in range(3):
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=12)
+                if response.status_code == 200:
+                    result = response.json()
+                    html = result['candidates'][0]['content']['parts'][0]['text']
+                    # Strip markdown code blocks if present
+                    html = re.sub(r"^```html\s*", "", html, flags=re.IGNORECASE)
+                    html = re.sub(r"^```\s*", "", html)
+                    html = re.sub(r"```$", "", html)
+                    
+                    # Rate limiting pause to stay safely under Free Tier RPM limit (~15 RPM = 4s per call)
+                    time.sleep(4)
+                    return html.strip()
+                elif response.status_code == 429:
+                    # Rate limited: wait exponentially (5s, 10s, 20s)
+                    wait_time = (2 ** attempt) * 5
+                    print(f"Gemini API rate limited (429). Pausing {wait_time}s before retry (Attempt {attempt + 1}/3)...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"Gemini API ({model_name}) returned status {response.status_code}: {response.text[:150]}")
+                    break # Try next model if non-rate-limit HTTP error
+            except Exception as e:
+                print(f"Gemini API attempt {attempt + 1} failed for '{word}' on {model_name}: {e}")
+                time.sleep(3)
+
     return None
 
 def clean_text(text):
