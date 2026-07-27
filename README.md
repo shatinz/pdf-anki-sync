@@ -16,15 +16,29 @@ A lightweight, automated desktop application that extracts highlighted vocabular
 4. **Automatic Card & Template Sync:** Creates or updates the `English-PDF-Vocabulary` Note Type in Anki (styled for both Light and Dark mode). Updating templates retroactively enables speech and formatting for existing cards.
 5. **Gemini API & Free Dictionary Support:** AI-powered context-aware breakdowns via Gemini (`gemini-2.5-flash` with rate-limiting pauses and exponential backoff retry logic), with a seamless fallback to the Free Dictionary API.
 6. **Modern Dark-Mode GUI:** Easy-to-use control panel with live activity logs and connection status indicators.
-7. **Standalone Windows Executable:** Run directly as a single `.exe` file without needing Python installed.
+7. **Multiple Launch Options:** Run directly via Python, double-click `run_gui.bat`, or use a standalone executable.
 
 ---
 
-## Quick Start (Standalone Executable)
+## Running the Application
 
-1. Download **`PDF_Anki_Sync.exe`** from the [Latest GitHub Release](https://github.com/shatinz/pdf-anki-sync/releases).
-2. Ensure **Anki Desktop** is running with the **AnkiConnect** add-on installed (code: `2055492159`).
-3. Double-click **`PDF_Anki_Sync.exe`** to launch the GUI.
+### Option 1: Direct Batch Launcher (Recommended - No False Positives)
+Double-click **`run_gui.bat`** in the project directory. This launches the application directly using your local Python environment without triggering heuristic antivirus flags.
+
+### Option 2: Command Line
+```bash
+python gui.py
+```
+
+### Option 3: Standalone Executable (`PDF_Anki_Sync.exe`)
+Download or build `PDF_Anki_Sync.exe` for single-file execution without needing an open terminal.
+
+> [!NOTE]
+> **Antivirus False Positive Notice (`Win32/Sabsik.TE.A!ml`):**  
+> Windows Defender's Heuristic Machine Learning engine (`!ml`) frequently flags uncompiled, unsigned PyInstaller single-file binaries as false positives (`Win32/Sabsik`). This occurs because single-file PyInstaller executables compress Python into an un-signed bootloader that extracts to `%TEMP%` at runtime.  
+> **This project is 100% open-source and safe.** If Windows Defender flags the compiled `.exe`, you can either:
+> 1. Run via **`run_gui.bat`** or `python gui.py` (never flags).
+> 2. Add an exception for `PDF_Anki_Sync.exe` in Windows Security -> Virus & threat protection -> Exclusions.
 
 ---
 
@@ -52,19 +66,12 @@ To achieve optimal scientific memory retention (90% target retention rate with m
 ## How to Use
 
 ### Using the GUI
-1. Run `PDF_Anki_Sync.exe` (or `python gui.py`).
+1. Run `run_gui.bat` or `python gui.py`.
 2. Verify top-right indicator says **`ANKI CONNECTED`**.
 3. Select your **Watch Directory** (the folder containing your PDF books).
 4. Click **Save Config**, then **Enable Auto-Watch**.
 5. Open any PDF in **Microsoft Edge**, highlight vocabulary words, and press **`Ctrl + S`**.
 6. The app automatically extracts the words and syncs them to Anki within 2 seconds!
-
-### Using Python Source
-If running from source:
-```bash
-pip install pymupdf requests pyinstaller
-python gui.py
-```
 
 ---
 
@@ -73,4 +80,4 @@ To build the `.exe` yourself:
 ```bash
 double-click build_exe.bat
 ```
-The output file will be generated in `dist/PDF_Anki_Sync.exe`.
+Output files are generated under `dist/`.
