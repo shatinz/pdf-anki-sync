@@ -616,6 +616,17 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
 
                 log(f"Found new highlight: '{highlight_text}' (Cleaned: '{clean_word}') on Page {page_num + 1}")
 
+                # Check for duplicates in Anki deck BEFORE making API calls
+                if not dry_run and anki and anki.note_exists(clean_word, config["deck_name"], config["note_type_name"]):
+                    log(f"Note for '{clean_word}' already exists in deck '{config['deck_name']}'. Skipping API call and Anki upload.")
+                    cache[abs_pdf_path].append({
+                        "page": page_num + 1,
+                        "word": highlight_text,
+                        "rect": rect,
+                        "skipped": False
+                    })
+                    continue
+
                 # Extract context sentence using the cleaned word
                 context_sentence = get_sentence_containing_word(page, annot.rect, clean_word)
                 formatted_context = bold_word_in_sentence(context_sentence, clean_word)
@@ -636,22 +647,18 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
                 # Add to Anki
                 success = True
                 if not dry_run and anki:
-                    # Check for duplicates in Anki deck
-                    if anki.note_exists(clean_word, config["deck_name"], config["note_type_name"]):
-                        log(f"Note for '{clean_word}' already exists in deck '{config['deck_name']}'. Skipping Anki upload.")
+                    fields = {
+                        "Word": clean_word,
+                        "Definition": definition,
+                        "Context": formatted_context,
+                        "Source": f"{pdf_filename} (Page {page_num + 1})"
+                    }
+                    note_id = anki.add_note(config["deck_name"], config["note_type_name"], fields)
+                    if note_id:
+                        log(f"Successfully added '{clean_word}' to Anki (ID: {note_id})")
                     else:
-                        fields = {
-                            "Word": clean_word,
-                            "Definition": definition,
-                            "Context": formatted_context,
-                            "Source": f"{pdf_filename} (Page {page_num + 1})"
-                        }
-                        note_id = anki.add_note(config["deck_name"], config["note_type_name"], fields)
-                        if note_id:
-                            log(f"Successfully added '{clean_word}' to Anki (ID: {note_id})")
-                        else:
-                            log(f"[ERROR] Failed to add '{clean_word}' to Anki.")
-                            success = False
+                        log(f"[ERROR] Failed to add '{clean_word}' to Anki.")
+                        success = False
 
                 if success:
                     # Add to local cache
