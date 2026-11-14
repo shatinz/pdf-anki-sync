@@ -21,3 +21,9 @@ __pycache__/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Local secrets and generated runtime state
+config.json
+synced_highlights.json
+sync_activity.log
+.venv/

@@ -542,7 +542,7 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
     if abs_pdf_path not in cache:
         cache[abs_pdf_path] = []
 
-    synced_coords = {tuple(h["rect"]) for h in cache[abs_pdf_path]}
+    synced_coords = {(h.get("page"), tuple(h["rect"])) for h in cache[abs_pdf_path] if "rect" in h}
 
     # Initialize Anki Client (if not dry run)
     anki = None
@@ -576,7 +576,7 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
                 rect_tuple = tuple(rect)
 
                 # Skip if already synced
-                if rect_tuple in synced_coords:
+                if (page_num + 1, rect_tuple) in synced_coords:
                     continue
 
                 # Extract highlighted text using word-level intersections
@@ -587,7 +587,7 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
                     intersect = word_rect & annot.rect
                     if not intersect.is_empty:
                         # Check if at least 40% of the word is within the highlight box
-                        if intersect.get_area() / word_rect.get_area() > 0.4:
+                        if word_rect.get_area() > 0 and intersect.get_area() / word_rect.get_area() > 0.4:
                             highlighted_words.append(w[4])
                 
                 highlight_text = " ".join(highlighted_words)
@@ -660,7 +660,7 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
                         log(f"[ERROR] Failed to add '{clean_word}' to Anki.")
                         success = False
 
-                if success:
+                if success and not dry_run:
                     # Add to local cache
                     cache[abs_pdf_path].append({
                         "page": page_num + 1,
@@ -672,7 +672,7 @@ def sync_pdf(pdf_path, dry_run=False, log_callback=None):
 
     doc.close()
 
-    if new_highlights_count > 0 or skipped_sentences_count > 0:
+    if not dry_run and (new_highlights_count > 0 or skipped_sentences_count > 0):
         save_cache(cache)
 
     log(f"Sync complete. Added {new_highlights_count} new words. Skipped {skipped_sentences_count} sentence highlights.")
