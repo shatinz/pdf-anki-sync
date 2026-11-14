@@ -36,9 +36,7 @@ Download or build `PDF_Anki_Sync.exe` for single-file execution without needing 
 > [!NOTE]
 > **Antivirus False Positive Notice (`Win32/Sabsik.TE.A!ml`):**  
 > Windows Defender's Heuristic Machine Learning engine (`!ml`) frequently flags uncompiled, unsigned PyInstaller single-file binaries as false positives (`Win32/Sabsik`). This occurs because single-file PyInstaller executables compress Python into an un-signed bootloader that extracts to `%TEMP%` at runtime.  
-> **This project is 100% open-source and safe.** If Windows Defender flags the compiled `.exe`, you can either:
-> 1. Run via **`run_gui.bat`** or `python gui.py` (never flags).
-> 2. Add an exception for `PDF_Anki_Sync.exe` in Windows Security -> Virus & threat protection -> Exclusions.
+> **Do not assume an antivirus detection is a false positive.** If Defender flags a binary, avoid running it until you have verified its source and inspected the build. Prefer reviewing the Python source, installing dependencies in a virtual environment, and launching `python gui.py`. Do not disable Defender or add blanket antivirus exclusions.
 
 ---
 
@@ -81,3 +79,18 @@ To build the `.exe` yourself:
 double-click build_exe.bat
 ```
 Output files are generated under `dist/`.
+
+---
+
+## Project status and release checklist
+
+**Status: experimental / source-only.** The README documents intended functionality, not an independently verified release. The app depends on Anki Desktop, AnkiConnect, local PDF annotation compatibility, and optional external services. Do not publish an executable as a trusted release without completing these checks:
+
+- [ ] Run a clean-environment installation and GUI smoke test on supported Windows versions.
+- [ ] Test highlight extraction with Edge-saved PDFs, including repeated saves, non-vocabulary highlights, and malformed PDFs.
+- [ ] Test AnkiConnect unavailable, API errors, duplicate prevention, and idempotent re-sync.
+- [ ] Verify no credentials, private PDFs, or sensitive annotation content are committed or logged.
+- [ ] Audit dependency versions and build artifacts; scan and sign any distributed binary.
+- [ ] Add automated tests and CI before marking a stable release.
+
+**Privacy:** PDF highlights and surrounding context may contain personal information. Review any AI/API integration before sending document text to external services.
